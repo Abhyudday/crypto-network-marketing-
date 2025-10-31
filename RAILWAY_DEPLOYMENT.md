@@ -28,9 +28,8 @@ git push -u origin main
 
 1. Go to [railway.app](https://railway.app)
 2. Click **"New Project"**
-3. Select **"Deploy from GitHub repo"**
-4. Choose your `crypto-mlm-platform` repository
-5. Railway will create a project
+3. Select **"Empty Project"** (don't deploy from GitHub yet)
+4. Give it a name: "Crypto MLM Platform"
 
 ### 3. Add PostgreSQL Database
 
@@ -43,8 +42,11 @@ git push -u origin main
 
 1. In your Railway project, click **"+ New"**
 2. Select **"GitHub Repo"** and choose your repository
-3. Set **Root Directory** to: `backend`
-4. Railway will auto-detect the Node.js project
+3. **IMPORTANT**: Click on the service settings (gear icon)
+4. Under **"Service Settings"**, set:
+   - **Root Directory**: `backend`
+   - **Watch Paths**: `backend/**`
+5. Railway will auto-detect the Node.js project from nixpacks.toml
 
 #### Backend Environment Variables:
 
@@ -88,8 +90,11 @@ PROFIT_COMPANY_PERCENT=40
 
 1. In your Railway project, click **"+ New"**
 2. Select **"GitHub Repo"** and choose your repository again
-3. Set **Root Directory** to: `frontend`
-4. Railway will auto-detect the Vite project
+3. **IMPORTANT**: Click on the service settings (gear icon)
+4. Under **"Service Settings"**, set:
+   - **Root Directory**: `frontend`
+   - **Watch Paths**: `frontend/**`
+5. Railway will auto-detect the Vite project from nixpacks.toml
 
 #### Frontend Environment Variables:
 

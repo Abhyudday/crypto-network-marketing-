@@ -84,10 +84,18 @@ See `.env.example` files in backend and frontend directories.
 
 ### Railway (Recommended)
 
-This project is configured for easy deployment to Railway:
+⚠️ **This is a monorepo** - Deploy backend and frontend as separate services.
 
-1. **Quick Start**: Run `./deploy-to-railway.sh`
-2. **Full Guide**: See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)
+**Quick Deploy:**
+1. Push to GitHub
+2. Create Railway "Empty Project"
+3. Add PostgreSQL database
+4. Deploy backend (Root Directory: `backend`)
+5. Deploy frontend (Root Directory: `frontend`)
+
+**Guides:**
+- 📋 [RAILWAY_STEPS.md](RAILWAY_STEPS.md) - Simple step-by-step guide
+- 📖 [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) - Detailed documentation
 
 Railway will host:
 - ✅ PostgreSQL Database

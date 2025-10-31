@@ -1,0 +1,8 @@
+# This file tells Railway this is a monorepo
+# Deploy backend and frontend as separate services
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "echo 'This is a monorepo. Deploy backend and frontend separately.'"

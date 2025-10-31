@@ -28,64 +28,42 @@ psql crypto_mlm -c "UPDATE \"User\" SET \"isAdmin\" = true WHERE email = 'your-e
 
 ## 🚂 Deploy to Railway
 
-### Step 1: Push to GitHub
+⚠️ **Important**: This is a monorepo. You need to deploy `backend` and `frontend` as **separate services**.
 
-```bash
-cd /Users/abhyuday/Desktop/mlm
+### Quick Deploy Steps:
 
-# Initialize git (if not done)
-git init
-git add .
-git commit -m "Initial commit"
+1. **Push to GitHub**
+   ```bash
+   cd /Users/abhyuday/Desktop/mlm
+   git init && git add . && git commit -m "Initial commit"
+   git remote add origin https://github.com/YOUR_USERNAME/crypto-mlm.git
+   git push -u origin main
+   ```
 
-# Create repo on GitHub, then:
-git remote add origin https://github.com/YOUR_USERNAME/your-repo.git
-git branch -M main
-git push -u origin main
-```
+2. **Create Railway Project**
+   - Go to https://railway.app
+   - Click "New Project" → "Empty Project"
 
-### Step 2: Deploy on Railway
+3. **Add PostgreSQL**
+   - Click "+ New" → "Database" → "PostgreSQL"
 
-1. Go to https://railway.app
-2. Click "New Project"
-3. Select "Deploy from GitHub repo"
-4. Choose your repository
+4. **Deploy Backend**
+   - Click "+ New" → "GitHub Repo" → Select your repo
+   - **Settings** → Set **Root Directory** to `backend`
+   - **Variables** → Add environment variables (see RAILWAY_STEPS.md)
+   - **Networking** → Generate domain
 
-### Step 3: Add Services
+5. **Deploy Frontend**
+   - Click "+ New" → "GitHub Repo" → Select your repo again
+   - **Settings** → Set **Root Directory** to `frontend`
+   - **Variables** → Add `VITE_API_URL` with backend URL
+   - **Networking** → Generate domain
 
-#### PostgreSQL Database:
-- Click "+ New" → "Database" → "PostgreSQL"
-- No configuration needed
+6. **Update URLs**
+   - Update backend `FRONTEND_URL` with frontend URL
+   - Done! 🎉
 
-#### Backend Service:
-- Click "+ New" → "GitHub Repo"
-- **Root Directory**: `backend`
-- **Environment Variables**:
-  ```
-  DATABASE_URL=${{Postgres.DATABASE_URL}}
-  PORT=5001
-  NODE_ENV=production
-  JWT_SECRET=your-secure-random-secret-here
-  FRONTEND_URL=https://your-frontend.railway.app
-  ```
-- Generate domain for backend
-
-#### Frontend Service:
-- Click "+ New" → "GitHub Repo" (same repo)
-- **Root Directory**: `frontend`
-- **Environment Variables**:
-  ```
-  VITE_API_URL=https://your-backend.railway.app/api
-  ```
-- Generate domain for frontend
-
-### Step 4: Update URLs
-
-1. Copy backend Railway URL
-2. Update frontend `VITE_API_URL` with backend URL
-3. Copy frontend Railway URL
-4. Update backend `FRONTEND_URL` with frontend URL
-5. Both services will auto-redeploy
+📖 **Detailed Guide**: See [RAILWAY_STEPS.md](RAILWAY_STEPS.md) for complete step-by-step instructions
 
 ## 📁 Files Created for Railway
 
