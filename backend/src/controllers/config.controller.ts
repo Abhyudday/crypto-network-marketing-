@@ -4,21 +4,43 @@ import { AuthRequest } from '../middleware/auth.middleware';
 
 const prisma = new PrismaClient();
 
-// Public endpoint to get deposit wallet address
+// Public endpoint to get deposit wallet
 export const getDepositWallet = async (req: Request, res: Response) => {
   try {
+    // First check database configuration
     const config = await prisma.systemConfig.findUnique({
       where: { key: 'ADMIN_DEPOSIT_WALLET' },
     });
 
-    if (!config) {
+    let walletAddress = config?.value;
+
+    // If not in database, check environment variables
+    if (!walletAddress && process.env.ADMIN_DEPOSIT_WALLET) {
+      walletAddress = process.env.ADMIN_DEPOSIT_WALLET;
+      
+      // Optionally save to database for future use
+      await prisma.systemConfig.upsert({
+        where: { key: 'ADMIN_DEPOSIT_WALLET' },
+        update: { 
+          value: walletAddress,
+          description: 'Admin wallet address for receiving USDT deposits (TRC20)',
+        },
+        create: {
+          key: 'ADMIN_DEPOSIT_WALLET',
+          value: walletAddress,
+          description: 'Admin wallet address for receiving USDT deposits (TRC20)',
+        },
+      });
+    }
+
+    if (!walletAddress) {
       return res.status(404).json({ 
         error: 'Deposit wallet not configured. Please contact admin.' 
       });
     }
 
     res.json({
-      walletAddress: config.value,
+      walletAddress,
       network: 'TRC20', // USDT on Tron network
       instructions: [
         'Send USDT (TRC20) to the wallet address shown above',
@@ -68,6 +90,7 @@ export const updateDepositWallet = async (req: AuthRequest, res: Response) => {
     res.json({
       message: 'Deposit wallet address updated successfully',
       config,
+      note: 'Environment variable ADMIN_DEPOSIT_WALLET can also be used as fallback configuration'
     });
   } catch (error) {
     console.error('Update deposit wallet error:', error);
