@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { sendVerificationEmail } from '../utils/email.util';
 import { generateReferralCode, generateVerificationToken } from '../utils/helpers';
 
@@ -132,10 +132,11 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // Skip email verification check
+    const jwtSecret = process.env.JWT_SECRET || 'default-secret';
     const token = jwt.sign(
       { userId: user.id, email: user.email },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      jwtSecret,
+      { expiresIn: '7d' }
     );
 
     res.json({

@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { 
   Wallet, Users, TrendingUp, Gift, LogOut, Copy, 
-  DollarSign, ArrowUpRight, ArrowDownLeft, History 
+  ArrowUpRight, ArrowDownLeft, History 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../utils/api';
