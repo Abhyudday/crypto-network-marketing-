@@ -20,6 +20,8 @@ export default function Dashboard() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [depositForm, setDepositForm] = useState({ amount: '', walletAddress: '', txHash: '' });
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', walletAddress: '' });
+  const [depositWalletInfo, setDepositWalletInfo] = useState<any>(null);
+  const [loadingWallet, setLoadingWallet] = useState(false);
 
   useEffect(() => {
     fetchDashboard();
@@ -34,6 +36,23 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchDepositWallet = async () => {
+    setLoadingWallet(true);
+    try {
+      const { data } = await api.get('/config/deposit-wallet');
+      setDepositWalletInfo(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to fetch deposit wallet');
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
+
+  const handleOpenDepositModal = () => {
+    setShowDepositModal(true);
+    fetchDepositWallet();
   };
 
   const handleDeposit = async (e: React.FormEvent) => {
@@ -169,7 +188,7 @@ export default function Dashboard() {
             <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
             <div className="grid grid-cols-2 gap-4">
               <button
-                onClick={() => setShowDepositModal(true)}
+                onClick={handleOpenDepositModal}
                 className="flex items-center justify-center gap-2 p-4 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors"
               >
                 <ArrowDownLeft className="h-5 w-5" />
@@ -255,56 +274,149 @@ export default function Dashboard() {
 
       {/* Deposit Modal */}
       {showDepositModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold mb-4">Deposit USDT</h3>
-            <form onSubmit={handleDeposit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Amount (USDT)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0.01"
-                  step="0.01"
-                  className="input"
-                  value={depositForm.amount}
-                  onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })}
-                />
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-6 my-8">
+            <h3 className="text-2xl font-bold mb-6 text-gray-900">Deposit USDT</h3>
+            
+            {loadingWallet ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                <p className="mt-3 text-gray-600">Loading payment information...</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Your Wallet Address
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  value={depositForm.walletAddress}
-                  onChange={(e) => setDepositForm({ ...depositForm, walletAddress: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Transaction Hash (Optional)
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  value={depositForm.txHash}
-                  onChange={(e) => setDepositForm({ ...depositForm, txHash: e.target.value })}
-                />
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setShowDepositModal(false)} className="btn btn-secondary flex-1">
-                  Cancel
+            ) : depositWalletInfo ? (
+              <>
+                {/* Payment Instructions */}
+                <div className="bg-gradient-to-br from-primary-50 to-blue-50 rounded-lg p-5 mb-6">
+                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-primary-600" />
+                    Step 1: Send USDT to Admin Wallet
+                  </h4>
+                  <div className="bg-white rounded-lg p-4 mb-3">
+                    <p className="text-xs text-gray-600 mb-2">Network: <span className="font-semibold text-primary-600">{depositWalletInfo.network}</span></p>
+                    <p className="text-xs text-gray-600 mb-2">Admin Wallet Address:</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-sm font-mono bg-gray-50 p-3 rounded border border-gray-200 break-all">
+                        {depositWalletInfo.walletAddress}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(depositWalletInfo.walletAddress);
+                          toast.success('Wallet address copied!');
+                        }}
+                        className="btn btn-secondary px-3 py-2"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-xs text-yellow-800">
+                      <strong>⚠️ Important:</strong> Only send USDT on {depositWalletInfo.network} network. Other tokens or networks will result in loss of funds.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Deposit Form */}
+                <form onSubmit={handleDeposit} className="space-y-4">
+                  <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">Step 2: Fill Deposit Details</h4>
+                    <p className="text-sm text-gray-600">After sending USDT, fill in the details below to submit your deposit request.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Amount Sent (USDT) *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="100"
+                      step="0.01"
+                      className="input"
+                      placeholder="Minimum: $100"
+                      value={depositForm.amount}
+                      onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Minimum deposit: $100 (Starter level)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Your Wallet Address *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="input"
+                      placeholder="Your USDT wallet address (for verification)"
+                      value={depositForm.walletAddress}
+                      onChange={(e) => setDepositForm({ ...depositForm, walletAddress: e.target.value })}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter the wallet address you sent USDT from
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Transaction Hash (TxHash)
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Optional but recommended for faster approval"
+                      value={depositForm.txHash}
+                      onChange={(e) => setDepositForm({ ...depositForm, txHash: e.target.value })}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Find this in your wallet's transaction history
+                    </p>
+                  </div>
+
+                  {/* Level Information */}
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">🎯 Member Levels</h4>
+                    <div className="text-xs space-y-1 text-gray-700">
+                      <p>💎 <strong>Starter:</strong> $100 - No level bonus</p>
+                      <p>🥉 <strong>Beginner:</strong> $500 - 3 level bonus</p>
+                      <p>🥈 <strong>Investor:</strong> $1,000 - 7 level bonus</p>
+                      <p>🥇 <strong>VIP:</strong> $5,000 - 10 level bonus</p>
+                      <p>👑 <strong>VVIP:</strong> $10,000 - 10 level bonus + 5% whole tree</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setShowDepositModal(false);
+                        setDepositWalletInfo(null);
+                      }} 
+                      className="btn btn-secondary flex-1"
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary flex-1">
+                      Submit Deposit Request
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-red-600 mb-4">Failed to load payment information.</p>
+                <p className="text-gray-600 mb-4">Please contact admin to configure the deposit wallet address.</p>
+                <button 
+                  onClick={() => setShowDepositModal(false)} 
+                  className="btn btn-secondary"
+                >
+                  Close
                 </button>
-                <button type="submit" className="btn btn-primary flex-1">
-                  Submit Deposit
-                </button>
               </div>
-            </form>
+            )}
           </div>
         </div>
       )}

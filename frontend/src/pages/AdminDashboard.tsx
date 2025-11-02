@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, DollarSign, TrendingUp, ArrowLeft, 
-  Check, X, Calendar 
+  Check, X, Calendar, Wallet, Settings
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../utils/api';
@@ -13,6 +13,8 @@ export default function AdminDashboard() {
   const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
   const [pendingWithdrawals, setPendingWithdrawals] = useState<any[]>([]);
   const [showTradingModal, setShowTradingModal] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [depositWallet, setDepositWallet] = useState('');
   const [tradingForm, setTradingForm] = useState({
     profitPercent: '',
     tradingDate: new Date().toISOString().split('T')[0],
@@ -91,6 +93,31 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchDepositWallet = async () => {
+    try {
+      const { data } = await api.get('/config/deposit-wallet');
+      setDepositWallet(data.walletAddress);
+    } catch (error) {
+      setDepositWallet('');
+    }
+  };
+
+  const handleOpenWalletModal = () => {
+    fetchDepositWallet();
+    setShowWalletModal(true);
+  };
+
+  const handleUpdateWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.put('/config/deposit-wallet', { walletAddress: depositWallet });
+      toast.success('Deposit wallet updated successfully!');
+      setShowWalletModal(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update wallet');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -157,10 +184,14 @@ export default function AdminDashboard() {
         </div>
 
         {/* Actions */}
-        <div className="mb-8">
+        <div className="mb-8 flex gap-4">
           <button onClick={() => setShowTradingModal(true)} className="btn btn-primary">
             <Calendar className="h-4 w-4 mr-2" />
             Input Trading Result
+          </button>
+          <button onClick={handleOpenWalletModal} className="btn btn-secondary">
+            <Wallet className="h-4 w-4 mr-2" />
+            Configure Deposit Wallet
           </button>
         </div>
 
@@ -332,6 +363,53 @@ export default function AdminDashboard() {
                 </button>
                 <button type="submit" className="btn btn-primary flex-1">
                   Submit
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Deposit Wallet Configuration Modal */}
+      {showWalletModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Settings className="h-6 w-6 text-primary-600" />
+              Configure Deposit Wallet
+            </h3>
+            <form onSubmit={handleUpdateWallet} className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-blue-800">
+                  <strong>ℹ️ Important:</strong> This wallet address will be shown to all users when they make deposits. Ensure it's a valid USDT (TRC20) address.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Admin USDT Wallet Address (TRC20)
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="input font-mono text-sm"
+                  placeholder="Enter your TRC20 USDT wallet address"
+                  value={depositWallet}
+                  onChange={(e) => setDepositWallet(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Users will send their deposits to this address
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowWalletModal(false)}
+                  className="btn btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary flex-1">
+                  Save Wallet
                 </button>
               </div>
             </form>
