@@ -72,9 +72,30 @@ export const register = async (req: Request, res: Response) => {
       message: 'Registration successful! You can now login.',
       userId: user.id,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack
+    });
+    
+    // Provide more specific error messages
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Username or email already exists' });
+    }
+    if (error.code === 'P2003') {
+      return res.status(400).json({ error: 'Invalid referral code' });
+    }
+    if (error.message?.includes('connect')) {
+      return res.status(500).json({ error: 'Database connection failed. Please try again.' });
+    }
+    
+    res.status(500).json({ 
+      error: 'Registration failed',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
