@@ -226,6 +226,61 @@ export const getBonusHistory = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const getDirectDownline = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const { page = 1, limit = 20 } = req.query;
+
+    // Get direct referrals
+    const referrals = await prisma.user.findMany({
+      where: { referrerId: userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        phone: true,
+        level: true,
+        balance: true,
+        totalDeposit: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (Number(page) - 1) * Number(limit),
+      take: Number(limit),
+    });
+
+    const total = await prisma.user.count({ where: { referrerId: userId } });
+
+    // Get total balance and count for each referral
+    const referralsWithStats = await Promise.all(
+      referrals.map(async (ref) => {
+        // Count their direct referrals
+        const directReferralsCount = await prisma.user.count({
+          where: { referrerId: ref.id },
+        });
+
+        return {
+          ...ref,
+          directReferralsCount,
+        };
+      })
+    );
+
+    res.json({
+      referrals: referralsWithStats,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get direct downline error:', error);
+    res.status(500).json({ error: 'Failed to fetch direct downline' });
+  }
+};
+
 // Helper functions
 async function getNetworkUsers(userId: string, maxLevel: number) {
   const users: any[] = [];

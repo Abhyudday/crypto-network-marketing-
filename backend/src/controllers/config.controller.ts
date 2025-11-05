@@ -118,3 +118,105 @@ export const getAllConfig = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch configuration' });
   }
 };
+
+// Public endpoint to check if withdrawals are enabled
+export const getWithdrawalStatus = async (req: Request, res: Response) => {
+  try {
+    const config = await prisma.systemConfig.findUnique({
+      where: { key: 'WITHDRAWAL_ENABLED' },
+    });
+
+    const isEnabled = config?.value === 'true';
+    const message = config?.description || 'Withdrawal system status';
+
+    res.json({
+      enabled: isEnabled,
+      message,
+    });
+  } catch (error) {
+    console.error('Get withdrawal status error:', error);
+    res.status(500).json({ error: 'Failed to fetch withdrawal status' });
+  }
+};
+
+// Admin endpoint to toggle withdrawal system
+export const toggleWithdrawal = async (req: AuthRequest, res: Response) => {
+  try {
+    const { enabled, message } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+
+    const config = await prisma.systemConfig.upsert({
+      where: { key: 'WITHDRAWAL_ENABLED' },
+      update: {
+        value: enabled.toString(),
+        description: message || (enabled ? 'Withdrawals are currently enabled' : 'Withdrawals are temporarily disabled'),
+      },
+      create: {
+        key: 'WITHDRAWAL_ENABLED',
+        value: enabled.toString(),
+        description: message || (enabled ? 'Withdrawals are currently enabled' : 'Withdrawals are temporarily disabled'),
+      },
+    });
+
+    // Log admin action
+    await prisma.adminAction.create({
+      data: {
+        adminId: req.userId!,
+        actionType: 'TOGGLE_WITHDRAWAL',
+        details: `${enabled ? 'Enabled' : 'Disabled'} withdrawal system`,
+      },
+    });
+
+    res.json({
+      message: `Withdrawal system ${enabled ? 'enabled' : 'disabled'} successfully`,
+      config,
+    });
+  } catch (error) {
+    console.error('Toggle withdrawal error:', error);
+    res.status(500).json({ error: 'Failed to toggle withdrawal system' });
+  }
+};
+
+// Admin endpoint to update system config
+export const updateConfig = async (req: AuthRequest, res: Response) => {
+  try {
+    const { key, value, description } = req.body;
+
+    if (!key || !value) {
+      return res.status(400).json({ error: 'Key and value are required' });
+    }
+
+    const config = await prisma.systemConfig.upsert({
+      where: { key },
+      update: {
+        value,
+        description,
+      },
+      create: {
+        key,
+        value,
+        description,
+      },
+    });
+
+    // Log admin action
+    await prisma.adminAction.create({
+      data: {
+        adminId: req.userId!,
+        actionType: 'UPDATE_CONFIG',
+        details: `Updated system config: ${key}`,
+      },
+    });
+
+    res.json({
+      message: 'Configuration updated successfully',
+      config,
+    });
+  } catch (error) {
+    console.error('Update config error:', error);
+    res.status(500).json({ error: 'Failed to update configuration' });
+  }
+};

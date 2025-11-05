@@ -349,6 +349,8 @@ export const distributeProfit = async (req: AuthRequest, res: Response) => {
     const profitPercent = tradingResult.profitPercent / 100;
     const investorShare = parseFloat(process.env.INVESTOR_PROFIT_SHARE || '0.6');
 
+    let totalBonusDistributed = 0;
+
     // Distribute profit to each user
     for (const user of users) {
       const userProfit = user.balance * profitPercent * investorShare;
@@ -379,6 +381,10 @@ export const distributeProfit = async (req: AuthRequest, res: Response) => {
           remarks: `Profit distribution for ${tradingResult.tradingDate.toDateString()}`,
         },
       });
+
+      // Auto-distribute network leveling bonus
+      const bonusDistributed = await distributeNetworkBonus(user.id, userProfit);
+      totalBonusDistributed += bonusDistributed;
     }
 
     // Mark as processed
@@ -393,19 +399,112 @@ export const distributeProfit = async (req: AuthRequest, res: Response) => {
         adminId,
         actionType: 'DISTRIBUTE_PROFIT',
         targetId: tradingResultId,
-        details: `Distributed ${tradingResult.profitPercent}% profit to ${users.length} users`,
+        details: `Distributed ${tradingResult.profitPercent}% profit to ${users.length} users. Total bonus distributed: ${totalBonusDistributed.toFixed(2)} USDT`,
       },
     });
 
     res.json({
       message: 'Profit distributed successfully',
       usersAffected: users.length,
+      totalBonusDistributed,
     });
   } catch (error) {
     console.error('Distribute profit error:', error);
     res.status(500).json({ error: 'Failed to distribute profit' });
   }
 };
+
+// Helper function to distribute network bonus based on user level
+async function distributeNetworkBonus(userId: string, profitAmount: number): Promise<number> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { referrerId: true },
+    });
+
+    if (!user?.referrerId) {
+      return 0; // No upline, no bonus to distribute
+    }
+
+    let totalDistributed = 0;
+    let currentReferrerId: string | null = user.referrerId;
+    let currentLevel = 1;
+    const maxLevels = 10;
+
+    // Level-based bonus percentages
+    const bonusRates: { [key: string]: { rate: number; maxLevel: number } } = {
+      'STARTER': { rate: 0.02, maxLevel: 1 },    // 2% for 1 level
+      'BEGINNER': { rate: 0.03, maxLevel: 3 },   // 3% for 3 levels
+      'INVESTOR': { rate: 0.05, maxLevel: 5 },   // 5% for 5 levels
+      'VIP': { rate: 0.07, maxLevel: 7 },        // 7% for 7 levels
+      'VVIP': { rate: 0.10, maxLevel: 10 },      // 10% for 10 levels
+    };
+
+    while (currentReferrerId && currentLevel <= maxLevels) {
+      const uplineUser = await prisma.user.findUnique({
+        where: { id: currentReferrerId },
+        select: {
+          id: true,
+          level: true,
+          balance: true,
+          referrerId: true,
+        },
+      });
+
+      if (!uplineUser) break;
+
+      const bonusConfig = bonusRates[uplineUser.level];
+      
+      // Check if this upline qualifies for bonus at this level
+      if (bonusConfig && currentLevel <= bonusConfig.maxLevel) {
+        const bonusAmount = profitAmount * bonusConfig.rate;
+
+        // Add bonus to upline's balance
+        await prisma.user.update({
+          where: { id: uplineUser.id },
+          data: {
+            balance: uplineUser.balance + bonusAmount,
+          },
+        });
+
+        // Record bonus history
+        await prisma.bonusHistory.create({
+          data: {
+            userId: uplineUser.id,
+            bonusAmount,
+            bonusType: 'NETWORK_LEVEL_BONUS',
+            sourceUserId: userId,
+            level: currentLevel,
+            calculatedFrom: profitAmount,
+            description: `Level ${currentLevel} bonus from ${user} (${bonusConfig.rate * 100}%)`,
+          },
+        });
+
+        // Create transaction record
+        await prisma.transaction.create({
+          data: {
+            userId: uplineUser.id,
+            amount: bonusAmount,
+            type: 'BONUS',
+            status: 'COMPLETED',
+            remarks: `Level ${currentLevel} network bonus`,
+          },
+        });
+
+        totalDistributed += bonusAmount;
+      }
+
+      // Move to next level
+      currentReferrerId = uplineUser.referrerId || null;
+      currentLevel++;
+    }
+
+    return totalDistributed;
+  } catch (error) {
+    console.error('Distribute network bonus error:', error);
+    return 0;
+  }
+}
 
 export const distributeBonus = async (req: AuthRequest, res: Response) => {
   try {
@@ -573,5 +672,148 @@ export const getAdminStats = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Get admin stats error:', error);
     res.status(500).json({ error: 'Failed to fetch admin stats' });
+  }
+};
+
+export const getRankingLevels = async (req: AuthRequest, res: Response) => {
+  try {
+    // Get all ranking level configurations from SystemConfig
+    const configs = await prisma.systemConfig.findMany({
+      where: {
+        key: {
+          startsWith: 'RANK_',
+        },
+      },
+      orderBy: { key: 'asc' },
+    });
+
+    // Parse the configurations
+    const levels = configs.map(config => {
+      const value = JSON.parse(config.value);
+      return {
+        key: config.key,
+        ...value,
+        description: config.description,
+      };
+    });
+
+    res.json(levels);
+  } catch (error) {
+    console.error('Get ranking levels error:', error);
+    res.status(500).json({ error: 'Failed to fetch ranking levels' });
+  }
+};
+
+export const updateRankingLevel = async (req: AuthRequest, res: Response) => {
+  try {
+    const adminId = req.userId!;
+    const { levelName, minDeposit, bonusPercentage, bonusLevels, description } = req.body;
+
+    if (!levelName || minDeposit === undefined) {
+      return res.status(400).json({ error: 'Level name and minimum deposit are required' });
+    }
+
+    const key = `RANK_${levelName.toUpperCase()}`;
+    const value = JSON.stringify({
+      levelName,
+      minDeposit: parseFloat(minDeposit),
+      bonusPercentage: parseFloat(bonusPercentage || 0),
+      bonusLevels: parseInt(bonusLevels || 0),
+    });
+
+    const config = await prisma.systemConfig.upsert({
+      where: { key },
+      update: {
+        value,
+        description: description || `Ranking level: ${levelName}`,
+      },
+      create: {
+        key,
+        value,
+        description: description || `Ranking level: ${levelName}`,
+      },
+    });
+
+    // Log admin action
+    await prisma.adminAction.create({
+      data: {
+        adminId,
+        actionType: 'UPDATE_RANKING_LEVEL',
+        details: `Updated ranking level: ${levelName}`,
+      },
+    });
+
+    res.json({
+      message: 'Ranking level updated successfully',
+      config,
+    });
+  } catch (error) {
+    console.error('Update ranking level error:', error);
+    res.status(500).json({ error: 'Failed to update ranking level' });
+  }
+};
+
+export const exportWithdrawals = async (req: AuthRequest, res: Response) => {
+  try {
+    const statusParam = (req.query.status as string) || 'PENDING';
+    const adminId = req.userId!;
+
+    // Get withdrawal requests
+    const withdrawals = await prisma.transaction.findMany({
+      where: {
+        type: 'WITHDRAWAL',
+        status: statusParam as any,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            phone: true,
+            level: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Format data as CSV (Excel-compatible)
+    const csvHeader = 'Transaction ID,Date,Username,Email,Phone,Level,Wallet Address,Amount (USDT),Status,Remarks\n';
+    const csvRows = withdrawals.map(tx => {
+      const date = new Date(tx.createdAt).toISOString().split('T')[0];
+      return [
+        tx.id,
+        date,
+        tx.user.username,
+        tx.user.email,
+        tx.user.phone,
+        tx.user.level,
+        tx.walletAddress || '',
+        tx.amount.toFixed(2),
+        tx.status,
+        (tx.remarks || '').replace(/,/g, ';'), // Replace commas in remarks
+      ].join(',');
+    }).join('\n');
+
+    const csv = csvHeader + csvRows;
+
+    // Log admin action
+    await prisma.adminAction.create({
+      data: {
+        adminId,
+        actionType: 'EXPORT_WITHDRAWALS',
+        details: `Exported ${withdrawals.length} ${statusParam} withdrawal requests`,
+      },
+    });
+
+    // Set headers for file download
+    const filename = `withdrawals_${statusParam.toLowerCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (error) {
+    console.error('Export withdrawals error:', error);
+    res.status(500).json({ error: 'Failed to export withdrawals' });
   }
 };

@@ -11,6 +11,9 @@ import {
   distributeBonus,
   getAllUsers,
   getAdminStats,
+  exportWithdrawals,
+  getRankingLevels,
+  updateRankingLevel,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -22,11 +25,14 @@ router.get('/stats', getAdminStats);
 router.get('/users', getAllUsers);
 router.get('/deposits/pending', getPendingDeposits);
 router.get('/withdrawals/pending', getPendingWithdrawals);
+router.get('/withdrawals/export', exportWithdrawals);
+router.get('/ranking-levels', getRankingLevels);
 router.post('/deposits/:transactionId/approve', approveDeposit);
 router.post('/withdrawals/:transactionId/approve', approveWithdrawal);
 router.post('/transactions/:transactionId/reject', rejectTransaction);
 router.post('/trading-result', inputTradingResult);
 router.post('/trading-result/:tradingResultId/distribute', distributeProfit);
 router.post('/bonus/:userId/distribute', distributeBonus);
+router.post('/ranking-level', updateRankingLevel);
 
 export default router;
