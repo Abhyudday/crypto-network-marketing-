@@ -828,3 +828,161 @@ export const exportWithdrawals = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to export withdrawals' });
   }
 };
+
+export const getMemberNetworkTree = async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        level: true,
+        balance: true,
+        totalDeposit: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Build network tree with full details
+    const networkTree = await buildAdminNetworkTree(userId, 10);
+
+    res.json({
+      user,
+      networkTree,
+    });
+  } catch (error) {
+    console.error('Get member network tree error:', error);
+    res.status(500).json({ error: 'Failed to fetch member network tree' });
+  }
+};
+
+export const getMemberDetails = async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        phone: true,
+        level: true,
+        balance: true,
+        totalDeposit: true,
+        referralCode: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get transactions history
+    const deposits = await prisma.transaction.findMany({
+      where: {
+        userId,
+        type: 'DEPOSIT',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    const withdrawals = await prisma.transaction.findMany({
+      where: {
+        userId,
+        type: 'WITHDRAWAL',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    // Get profit history
+    const profits = await prisma.profitHistory.findMany({
+      where: { userId },
+      orderBy: { tradingDate: 'desc' },
+      take: 50,
+    });
+
+    // Get bonus history
+    const bonuses = await prisma.bonusHistory.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    // Get direct referrals count
+    const directReferrals = await prisma.user.count({
+      where: { referrerId: userId },
+    });
+
+    res.json({
+      user,
+      deposits,
+      withdrawals,
+      profits,
+      bonuses,
+      directReferrals,
+    });
+  } catch (error) {
+    console.error('Get member details error:', error);
+    res.status(500).json({ error: 'Failed to fetch member details' });
+  }
+};
+
+// Helper function to build network tree for admin view
+async function buildAdminNetworkTree(userId: string, maxLevel: number) {
+  const buildLevel = async (id: string, currentLevel: number): Promise<any> => {
+    if (currentLevel >= maxLevel) return null;
+
+    const referrals = await prisma.user.findMany({
+      where: { referrerId: id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        balance: true,
+        totalDeposit: true,
+        level: true,
+        createdAt: true,
+      },
+    });
+
+    if (referrals.length === 0) return [];
+
+    const children = await Promise.all(
+      referrals.map(async (ref) => ({
+        ...ref,
+        children: await buildLevel(ref.id, currentLevel + 1),
+      }))
+    );
+
+    return children;
+  };
+
+  const rootUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      balance: true,
+      totalDeposit: true,
+      level: true,
+      createdAt: true,
+    },
+  });
+
+  return {
+    ...rootUser,
+    children: await buildLevel(userId, 0),
+  };
+}

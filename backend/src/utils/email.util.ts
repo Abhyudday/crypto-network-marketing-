@@ -69,3 +69,27 @@ export const sendWithdrawalApprovedEmail = async (
     `,
   });
 };
+
+export const sendPasswordResetEmail = async (email: string, token: string) => {
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: email,
+    subject: 'Password Reset - Crypto MLM Platform',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Password Reset Request</h2>
+        <p>You requested to reset your password. Click the button below to reset it:</p>
+        <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0;">
+          Reset Password
+        </a>
+        <p>Or copy and paste this link in your browser:</p>
+        <p style="color: #666;">${resetUrl}</p>
+        <p>This link will expire in 1 hour.</p>
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+        <p style="color: #999; font-size: 12px;">If you didn't request this, please ignore this email.</p>
+      </div>
+    `,
+  });
+};

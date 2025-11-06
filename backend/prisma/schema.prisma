@@ -42,6 +42,8 @@ model User {
   referrerId        String?
   emailVerified     Boolean  @default(false)
   verificationToken String?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
   isAdmin           Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

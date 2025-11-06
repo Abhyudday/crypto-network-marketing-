@@ -14,6 +14,8 @@ import {
   exportWithdrawals,
   getRankingLevels,
   updateRankingLevel,
+  getMemberNetworkTree,
+  getMemberDetails,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -27,6 +29,8 @@ router.get('/deposits/pending', getPendingDeposits);
 router.get('/withdrawals/pending', getPendingWithdrawals);
 router.get('/withdrawals/export', exportWithdrawals);
 router.get('/ranking-levels', getRankingLevels);
+router.get('/member/:userId/network-tree', getMemberNetworkTree);
+router.get('/member/:userId/details', getMemberDetails);
 router.post('/deposits/:transactionId/approve', approveDeposit);
 router.post('/withdrawals/:transactionId/approve', approveWithdrawal);
 router.post('/transactions/:transactionId/reject', rejectTransaction);
