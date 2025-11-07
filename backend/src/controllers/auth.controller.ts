@@ -213,18 +213,29 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const resetToken = generateVerificationToken();
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetToken,
-        resetTokenExpiry,
-      },
-    });
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          resetToken,
+          resetTokenExpiry,
+        },
+      });
 
-    // Send reset email
-    await sendPasswordResetEmail(user.email, resetToken);
+      // Send reset email
+      await sendPasswordResetEmail(user.email, resetToken);
 
-    res.json({ message: 'If the email exists, a password reset link has been sent' });
+      res.json({ message: 'If the email exists, a password reset link has been sent' });
+    } catch (dbError: any) {
+      // Check if it's a column not found error
+      if (dbError.code === 'P2022' && dbError.message?.includes('resetToken')) {
+        console.error('Database schema outdated - resetToken columns missing. Run migrations!');
+        return res.status(503).json({ 
+          error: 'Password reset is temporarily unavailable. Please contact support or try again later.' 
+        });
+      }
+      throw dbError; // Re-throw if it's a different error
+    }
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({ error: 'Failed to process request' });
@@ -259,16 +270,27 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        resetToken: null,
-        resetTokenExpiry: null,
-      },
-    });
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          resetToken: null,
+          resetTokenExpiry: null,
+        },
+      });
 
-    res.json({ message: 'Password reset successful. You can now login with your new password.' });
+      res.json({ message: 'Password reset successful. You can now login with your new password.' });
+    } catch (dbError: any) {
+      // Check if it's a column not found error
+      if (dbError.code === 'P2022' && dbError.message?.includes('resetToken')) {
+        console.error('Database schema outdated - resetToken columns missing. Run migrations!');
+        return res.status(503).json({ 
+          error: 'Password reset is temporarily unavailable. Please contact support or try again later.' 
+        });
+      }
+      throw dbError; // Re-throw if it's a different error
+    }
   } catch (error) {
     console.error('Reset password error:', error);
     res.status(500).json({ error: 'Failed to reset password' });
