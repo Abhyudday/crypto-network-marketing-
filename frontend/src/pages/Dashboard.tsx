@@ -268,23 +268,33 @@ export default function Dashboard() {
             <h3 className="text-lg font-semibold mb-4">Recent Transactions</h3>
             {dashboardData?.recentTransactions?.length > 0 ? (
               <div className="space-y-2">
-                {dashboardData.recentTransactions.slice(0, 5).map((tx: any) => (
-                  <div key={tx.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                    <div className="flex items-center gap-2">
-                      <History className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm">{tx.type}</span>
+                {dashboardData.recentTransactions.slice(0, 5).map((tx: any) => {
+                  // Show "LOSS" instead of "PROFIT" when amount is negative
+                  const displayType = tx.type === 'PROFIT' && tx.amount < 0 ? 'LOSS' : tx.type;
+                  const isNegative = tx.amount < 0;
+                  
+                  return (
+                    <div key={tx.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                      <div className="flex items-center gap-2">
+                        <History className="h-4 w-4 text-gray-400" />
+                        <span className={`text-sm ${isNegative && tx.type === 'PROFIT' ? 'text-red-600' : ''}`}>
+                          {displayType}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-sm font-semibold ${isNegative ? 'text-red-600' : ''}`}>
+                          ${tx.amount.toFixed(2)}
+                        </p>
+                        <p className={`text-xs ${
+                          tx.status === 'APPROVED' || tx.status === 'COMPLETED' ? 'text-green-600' :
+                          tx.status === 'PENDING' ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {tx.status}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">${tx.amount.toFixed(2)}</p>
-                      <p className={`text-xs ${
-                        tx.status === 'APPROVED' ? 'text-green-600' :
-                        tx.status === 'PENDING' ? 'text-yellow-600' : 'text-red-600'
-                      }`}>
-                        {tx.status}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-gray-500 text-sm">No transactions yet</p>
