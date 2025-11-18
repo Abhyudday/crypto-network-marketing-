@@ -18,11 +18,13 @@ export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showBonusBreakdown, setShowBonusBreakdown] = useState(false);
   const [depositForm, setDepositForm] = useState({ amount: '', walletAddress: '', txHash: '' });
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', walletAddress: '' });
   const [depositWalletInfo, setDepositWalletInfo] = useState<any>(null);
   const [loadingWallet, setLoadingWallet] = useState(false);
   const [withdrawalTimeStatus, setWithdrawalTimeStatus] = useState<any>(null);
+  const [bonusBreakdown, setBonusBreakdown] = useState<any>(null);
 
   useEffect(() => {
     fetchDashboard();
@@ -61,6 +63,21 @@ export default function Dashboard() {
       return null;
     }
   };
+
+  const fetchBonusBreakdown = async () => {
+    try {
+      const { data } = await api.get('/user/daily-bonus-breakdown');
+      setBonusBreakdown(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to fetch bonus breakdown');
+    }
+  };
+
+  useEffect(() => {
+    if (showBonusBreakdown) {
+      fetchBonusBreakdown();
+    }
+  }, [showBonusBreakdown]);
 
   const handleOpenDepositModal = () => {
     setShowDepositModal(true);
@@ -190,13 +207,14 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card cursor-pointer hover:shadow-md transition-shadow" onClick={() => setShowBonusBreakdown(!showBonusBreakdown)}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Bonus</p>
+                <p className="text-sm text-gray-600">Daily Bonus</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  ${dashboardData?.stats?.totalBonus?.toFixed(2) || '0.00'}
+                  ${dashboardData?.stats?.todayBonus?.toFixed(2) || '0.00'}
                 </p>
+                <p className="text-xs text-gray-500 mt-1">Click for details</p>
               </div>
               <Gift className="h-10 w-10 text-purple-600" />
             </div>
@@ -277,9 +295,18 @@ export default function Dashboard() {
                     <div key={tx.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <div className="flex items-center gap-2">
                         <History className="h-4 w-4 text-gray-400" />
-                        <span className={`text-sm ${isNegative && tx.type === 'PROFIT' ? 'text-red-600' : ''}`}>
-                          {displayType}
-                        </span>
+                        <div>
+                          <span className={`text-sm font-medium ${isNegative && tx.type === 'PROFIT' ? 'text-red-600' : ''}`}>
+                            {displayType}
+                          </span>
+                          <p className="text-xs text-gray-500">
+                            {new Date(tx.createdAt).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right">
                         <p className={`text-sm font-semibold ${isNegative ? 'text-red-600' : ''}`}>
@@ -437,7 +464,7 @@ export default function Dashboard() {
                         <p>🥉 <strong>Beginner:</strong> 5 {depositWalletInfo.tokenName} - 3 level bonus</p>
                         <p>🥈 <strong>Investor:</strong> 10 {depositWalletInfo.tokenName} - 7 level bonus</p>
                         <p>🥇 <strong>VIP:</strong> 50 {depositWalletInfo.tokenName} - 10 level bonus</p>
-                        <p>👑 <strong>VVIP:</strong> 100 {depositWalletInfo.tokenName} - 10 level bonus + 5% whole tree</p>
+                        <p>👑 <strong>VVIP:</strong> 100 {depositWalletInfo.tokenName} - 10 level bonus + Special Report</p>
                       </div>
                     ) : (
                       <div className="text-xs space-y-1 text-gray-700">
@@ -445,7 +472,7 @@ export default function Dashboard() {
                         <p>🥉 <strong>Beginner:</strong> $500 - 3 level bonus</p>
                         <p>🥈 <strong>Investor:</strong> $1,000 - 7 level bonus</p>
                         <p>🥇 <strong>VIP:</strong> $5,000 - 10 level bonus</p>
-                        <p>👑 <strong>VVIP:</strong> $10,000 - 10 level bonus + 5% whole tree</p>
+                        <p>👑 <strong>VVIP:</strong> $10,000 - 10 level bonus + Special Report</p>
                       </div>
                     )}
                   </div>
@@ -547,6 +574,84 @@ export default function Dashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bonus Breakdown Modal */}
+      {showBonusBreakdown && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">Daily Bonus Breakdown</h3>
+            
+            {bonusBreakdown ? (
+              <>
+                <div className="bg-purple-50 rounded-lg p-4 mb-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm text-gray-600">Date</p>
+                      <p className="font-semibold">{new Date(bonusBreakdown.date).toLocaleDateString('en-US', { 
+                        month: 'long', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600">Total Daily Bonus</p>
+                      <p className="text-2xl font-bold text-purple-600">${bonusBreakdown.totalDailyBonus?.toFixed(2) || '0.00'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {bonusBreakdown.bonuses && bonusBreakdown.bonuses.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-700 mb-2">Bonus Details ({bonusBreakdown.count} transactions)</p>
+                    {bonusBreakdown.bonuses.map((bonus: any, index: number) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">{bonus.bonusType}</p>
+                            {bonus.description && (
+                              <p className="text-sm text-gray-600 mt-1">{bonus.description}</p>
+                            )}
+                            {bonus.level && (
+                              <p className="text-xs text-gray-500 mt-1">Level {bonus.level} Bonus</p>
+                            )}
+                          </div>
+                          <div className="text-right ml-4">
+                            <p className="font-bold text-purple-600">${bonus.bonusAmount.toFixed(2)}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(bonus.createdAt).toLocaleTimeString('en-US', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No bonuses received today</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                <p className="mt-3 text-gray-600">Loading bonus details...</p>
+              </div>
+            )}
+
+            <div className="mt-6">
+              <button 
+                onClick={() => setShowBonusBreakdown(false)} 
+                className="btn btn-secondary w-full"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

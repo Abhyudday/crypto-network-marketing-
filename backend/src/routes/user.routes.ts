@@ -7,6 +7,7 @@ import {
   getTransactionHistory,
   getProfitHistory,
   getBonusHistory,
+  getDailyBonusBreakdown,
   getDirectDownline,
 } from '../controllers/user.controller';
 
@@ -21,5 +22,6 @@ router.get('/profile', getProfile);
 router.get('/transactions', getTransactionHistory);
 router.get('/profit-history', getProfitHistory);
 router.get('/bonus-history', getBonusHistory);
+router.get('/daily-bonus-breakdown', getDailyBonusBreakdown);
 
 export default router;

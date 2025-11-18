@@ -73,6 +73,29 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
       _sum: { bonusAmount: true },
     });
 
+    // Get total profit
+    const totalProfit = await prisma.profitHistory.aggregate({
+      where: { userId },
+      _sum: { profitAmount: true },
+    });
+
+    // Get today's bonus
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todayBonus = await prisma.bonusHistory.aggregate({
+      where: {
+        userId,
+        createdAt: {
+          gte: today,
+          lt: tomorrow,
+        },
+      },
+      _sum: { bonusAmount: true },
+    });
+
     res.json({
       user,
       stats: {
@@ -81,6 +104,8 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
         totalWholeNetworkBalance,
         yesterdayProfitPercent: yesterdayProfit?.profitPercent || 0,
         totalBonus: totalBonus._sum.bonusAmount || 0,
+        totalProfit: totalProfit._sum.profitAmount || 0,
+        todayBonus: todayBonus._sum.bonusAmount || 0,
       },
       recentTransactions,
     });
@@ -223,6 +248,45 @@ export const getBonusHistory = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Bonus history error:', error);
     res.status(500).json({ error: 'Failed to fetch bonus history' });
+  }
+};
+
+export const getDailyBonusBreakdown = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const { date } = req.query;
+
+    // Get today's date if not provided
+    const targetDate = date ? new Date(date as string) : new Date();
+    targetDate.setHours(0, 0, 0, 0);
+
+    const nextDay = new Date(targetDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    // Get bonuses for the specific date
+    const bonuses = await prisma.bonusHistory.findMany({
+      where: {
+        userId,
+        createdAt: {
+          gte: targetDate,
+          lt: nextDay,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Calculate total
+    const totalDailyBonus = bonuses.reduce((sum, bonus) => sum + bonus.bonusAmount, 0);
+
+    res.json({
+      date: targetDate,
+      bonuses,
+      totalDailyBonus,
+      count: bonuses.length,
+    });
+  } catch (error) {
+    console.error('Daily bonus breakdown error:', error);
+    res.status(500).json({ error: 'Failed to fetch daily bonus breakdown' });
   }
 };
 

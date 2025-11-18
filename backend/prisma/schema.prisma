@@ -27,6 +27,7 @@ enum TransactionType {
   WITHDRAWAL
   PROFIT
   BONUS
+  ADJUSTMENT
 }
 
 model User {

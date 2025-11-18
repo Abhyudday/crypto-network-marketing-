@@ -16,6 +16,8 @@ import {
   updateRankingLevel,
   getMemberNetworkTree,
   getMemberDetails,
+  adjustUserBalance,
+  getRecentTransactions,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -31,6 +33,7 @@ router.get('/withdrawals/export', exportWithdrawals);
 router.get('/ranking-levels', getRankingLevels);
 router.get('/member/:userId/network-tree', getMemberNetworkTree);
 router.get('/member/:userId/details', getMemberDetails);
+router.get('/transactions/recent', getRecentTransactions);
 router.post('/deposits/:transactionId/approve', approveDeposit);
 router.post('/withdrawals/:transactionId/approve', approveWithdrawal);
 router.post('/transactions/:transactionId/reject', rejectTransaction);
@@ -38,5 +41,6 @@ router.post('/trading-result', inputTradingResult);
 router.post('/trading-result/:tradingResultId/distribute', distributeProfit);
 router.post('/bonus/:userId/distribute', distributeBonus);
 router.post('/ranking-level', updateRankingLevel);
+router.post('/user/:userId/adjust-balance', adjustUserBalance);
 
 export default router;

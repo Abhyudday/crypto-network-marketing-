@@ -412,6 +412,12 @@ export const distributeProfit = async (req: AuthRequest, res: Response) => {
     let totalBonusDistributed = 0;
     let totalProfitDistributed = 0;
 
+    // Check if testnet mode for rank calculation
+    const network = process.env.DEPOSIT_NETWORK || 'Sepolia Testnet';
+    const isTestnet = network.toLowerCase().includes('test') || 
+                      network.toLowerCase().includes('sepolia') || 
+                      network.toLowerCase().includes('goerli');
+
     // Distribute profit to each user based on their rank
     for (const user of users) {
       // Get profit share ratio based on user's rank
@@ -421,10 +427,15 @@ export const distributeProfit = async (req: AuthRequest, res: Response) => {
       const userProfit = user.balance * profitPercent * userShare;
       totalProfitDistributed += userProfit;
 
+      // Calculate new balance and rank
+      const newBalance = user.balance + userProfit;
+      const newLevel = calculateRankFromBalance(newBalance, isTestnet);
+
       await prisma.user.update({
         where: { id: user.id },
         data: {
-          balance: user.balance + userProfit,
+          balance: newBalance,
+          level: newLevel,
         },
       });
 
@@ -485,7 +496,11 @@ async function distributeNetworkBonus(userId: string, profitAmount: number, trad
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { referrerId: true },
+      select: { 
+        referrerId: true,
+        level: true,
+        balance: true,
+      },
     });
 
     if (!user?.referrerId) {
@@ -493,8 +508,18 @@ async function distributeNetworkBonus(userId: string, profitAmount: number, trad
     }
 
     // Get configurable level bonus percentages
-    const { getLevelBonusPercentages } = await import('../utils/rank.util');
+    const { getLevelBonusPercentages, getRankConfig } = await import('../utils/rank.util');
     const levelBonuses = await getLevelBonusPercentages();
+
+    // Get the SOURCE user's profit share config to calculate company share correctly
+    const sourceUserConfig = getRankConfig(user.level as any);
+    const sourceUserShare = sourceUserConfig.profitShareUser / 100;
+    const sourceCompanyShare = sourceUserConfig.profitShareCompany / 100;
+    
+    // Calculate the company's portion from the source user's profit
+    // If user got profitAmount with their share %, company's portion would be:
+    // companyPortion = (profitAmount / userShare) * companyShare
+    const companyPortion = (profitAmount / sourceUserShare) * sourceCompanyShare;
 
     let totalDistributed = 0;
     let currentReferrerId: string | null = user.referrerId;
@@ -529,7 +554,7 @@ async function distributeNetworkBonus(userId: string, profitAmount: number, trad
       const nextReferrerId: string | null = uplineUserData.referrerId;
 
       // Check if upline is eligible for this level bonus
-      const { isEligibleForLevelBonus, getRankConfig } = await import('../utils/rank.util');
+      const { isEligibleForLevelBonus } = await import('../utils/rank.util');
       const isEligible = isEligibleForLevelBonus(uplineLevel as any, currentLevel);
       
       if (isEligible) {
@@ -539,15 +564,25 @@ async function distributeNetworkBonus(userId: string, profitAmount: number, trad
         
         const bonusRate = levelBonus.percentage / 100;
         
-        // Calculate bonus from company's profit share
-        const companyShare = getRankConfig(uplineLevel as any).profitShareCompany / 100;
-        const bonusAmount = profitAmount * companyShare * bonusRate;
+        // Calculate bonus from the SOURCE user's company share portion
+        const bonusAmount = companyPortion * bonusRate;
 
-        // Add bonus to upline's balance
+        // Update upline's balance and recalculate rank
+        const newBalance = uplineBalance + bonusAmount;
+        
+        // Check if testnet mode for rank calculation
+        const network = process.env.DEPOSIT_NETWORK || 'Sepolia Testnet';
+        const isTestnet = network.toLowerCase().includes('test') || 
+                          network.toLowerCase().includes('sepolia') || 
+                          network.toLowerCase().includes('goerli');
+        
+        const newRank = calculateRankFromBalance(newBalance, isTestnet);
+        
         await prisma.user.update({
           where: { id: uplineId },
           data: {
-            balance: uplineBalance + bonusAmount,
+            balance: newBalance,
+            level: newRank,
           },
         });
 
@@ -1023,6 +1058,111 @@ export const getMemberDetails = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Get member details error:', error);
     res.status(500).json({ error: 'Failed to fetch member details' });
+  }
+};
+
+export const adjustUserBalance = async (req: AuthRequest, res: Response) => {
+  try {
+    const adminId = req.userId!;
+    const { userId } = req.params;
+    const { amount, type, reason } = req.body;
+
+    if (!amount || !type || !reason) {
+      return res.status(400).json({ error: 'Amount, type, and reason are required' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        balance: true,
+        level: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const adjustmentAmount = parseFloat(amount);
+    const newBalance = type === 'ADD' ? user.balance + adjustmentAmount : user.balance - adjustmentAmount;
+
+    if (newBalance < 0) {
+      return res.status(400).json({ error: 'Insufficient balance for deduction' });
+    }
+
+    // Update user balance
+    await prisma.user.update({
+      where: { id: userId },
+      data: { balance: newBalance },
+    });
+
+    // Create transaction record
+    await prisma.transaction.create({
+      data: {
+        userId: user.id,
+        amount: type === 'ADD' ? adjustmentAmount : -adjustmentAmount,
+        type: 'ADJUSTMENT',
+        status: 'COMPLETED',
+        remarks: `Manual ${type === 'ADD' ? 'addition' : 'deduction'} by admin: ${reason}`,
+      },
+    });
+
+    // Log admin action
+    await prisma.adminAction.create({
+      data: {
+        adminId,
+        actionType: 'ADJUST_BALANCE',
+        targetId: userId,
+        details: `${type === 'ADD' ? 'Added' : 'Deducted'} ${adjustmentAmount} USDT ${type === 'ADD' ? 'to' : 'from'} ${user.username}. Reason: ${reason}`,
+      },
+    });
+
+    res.json({
+      message: 'Balance adjusted successfully',
+      newBalance,
+      adjustment: type === 'ADD' ? adjustmentAmount : -adjustmentAmount,
+    });
+  } catch (error) {
+    console.error('Adjust balance error:', error);
+    res.status(500).json({ error: 'Failed to adjust balance' });
+  }
+};
+
+export const getRecentTransactions = async (req: AuthRequest, res: Response) => {
+  try {
+    const { limit = 50, type, userId } = req.query;
+
+    const where: any = {};
+    if (type) {
+      where.type = type;
+    }
+    if (userId) {
+      where.userId = userId;
+    }
+
+    const transactions = await prisma.transaction.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            level: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Number(limit),
+    });
+
+    res.json(transactions);
+  } catch (error) {
+    console.error('Get recent transactions error:', error);
+    res.status(500).json({ error: 'Failed to fetch recent transactions' });
   }
 };
 
