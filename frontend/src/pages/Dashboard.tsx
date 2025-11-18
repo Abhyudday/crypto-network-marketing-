@@ -464,7 +464,7 @@ export default function Dashboard() {
                         <p>🥉 <strong>Beginner:</strong> 5 {depositWalletInfo.tokenName} - 3 level bonus</p>
                         <p>🥈 <strong>Investor:</strong> 10 {depositWalletInfo.tokenName} - 7 level bonus</p>
                         <p>🥇 <strong>VIP:</strong> 50 {depositWalletInfo.tokenName} - 10 level bonus</p>
-                        <p>👑 <strong>VVIP:</strong> 100 {depositWalletInfo.tokenName} - 10 level bonus + Special Report</p>
+                        <p>👑 <strong>VVIP:</strong> 100 {depositWalletInfo.tokenName} - 10 level bonus + Special Support</p>
                       </div>
                     ) : (
                       <div className="text-xs space-y-1 text-gray-700">
@@ -472,7 +472,7 @@ export default function Dashboard() {
                         <p>🥉 <strong>Beginner:</strong> $500 - 3 level bonus</p>
                         <p>🥈 <strong>Investor:</strong> $1,000 - 7 level bonus</p>
                         <p>🥇 <strong>VIP:</strong> $5,000 - 10 level bonus</p>
-                        <p>👑 <strong>VVIP:</strong> $10,000 - 10 level bonus + Special Report</p>
+                        <p>👑 <strong>VVIP:</strong> $10,000 - 10 level bonus + Special Support</p>
                       </div>
                     )}
                   </div>

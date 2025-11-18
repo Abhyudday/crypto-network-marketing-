@@ -263,14 +263,25 @@ export const getDailyBonusBreakdown = async (req: AuthRequest, res: Response) =>
     const nextDay = new Date(targetDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
-    // Get bonuses for the specific date
+    // Get bonuses for the specific date using tradingDate (which is the actual bonus date)
     const bonuses = await prisma.bonusHistory.findMany({
       where: {
         userId,
-        createdAt: {
-          gte: targetDate,
-          lt: nextDay,
-        },
+        OR: [
+          {
+            tradingDate: {
+              gte: targetDate,
+              lt: nextDay,
+            },
+          },
+          {
+            tradingDate: null,
+            createdAt: {
+              gte: targetDate,
+              lt: nextDay,
+            },
+          },
+        ],
       },
       orderBy: { createdAt: 'desc' },
     });
