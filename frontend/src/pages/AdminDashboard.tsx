@@ -21,6 +21,15 @@ export default function AdminDashboard() {
   const [selectedDeposit, setSelectedDeposit] = useState<any>(null);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [memberDetails, setMemberDetails] = useState<any>(null);
+  const [showBalanceAdjustModal, setShowBalanceAdjustModal] = useState(false);
+  const [balanceAdjustForm, setBalanceAdjustForm] = useState({
+    amount: '',
+    type: 'ADD',
+    reason: '',
+  });
+  const [showNetworkTreeModal, setShowNetworkTreeModal] = useState(false);
+  const [networkTree, setNetworkTree] = useState<any>(null);
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [tradingForm, setTradingForm] = useState({
     profitPercent: '',
     tradingDate: new Date().toISOString().split('T')[0],
@@ -30,6 +39,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData();
     fetchAllUsers();
+    fetchRecentTransactions();
   }, []);
 
   const fetchData = async () => {
@@ -140,6 +150,40 @@ export default function AdminDashboard() {
       setShowWalletModal(false);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update wallet');
+    }
+  };
+
+  const handleAdjustBalance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMember) return;
+    
+    try {
+      await api.post(`/admin/user/${selectedMember.id}/adjust-balance`, balanceAdjustForm);
+      toast.success('Balance adjusted successfully!');
+      setShowBalanceAdjustModal(false);
+      setBalanceAdjustForm({ amount: '', type: 'ADD', reason: '' });
+      fetchMemberDetails(selectedMember.id);
+      fetchAllUsers();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to adjust balance');
+    }
+  };
+
+  const fetchNetworkTree = async (userId: string) => {
+    try {
+      const { data } = await api.get(`/admin/member/${userId}/network-tree`);
+      setNetworkTree(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to fetch network tree');
+    }
+  };
+
+  const fetchRecentTransactions = async () => {
+    try {
+      const { data } = await api.get('/admin/transactions/recent?limit=100');
+      setRecentTransactions(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to fetch recent transactions');
     }
   };
 
@@ -320,7 +364,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Pending Withdrawals */}
-            <div className="card">
+            <div className="card mb-8">
           <h3 className="text-lg font-semibold mb-4">
             Pending Withdrawals ({pendingWithdrawals.length})
           </h3>
@@ -371,6 +415,71 @@ export default function AdminDashboard() {
           ) : (
             <p className="text-gray-500 text-sm">No pending withdrawals</p>
           )}
+            </div>
+
+            {/* Recent Transactions */}
+            <div className="card">
+              <h3 className="text-lg font-semibold mb-4">
+                Recent Transactions ({recentTransactions.length})
+              </h3>
+              {recentTransactions.length > 0 ? (
+                <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {recentTransactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {new Date(tx.createdAt).toLocaleString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+                          <td className="px-4 py-3 text-sm">{tx.user.username}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                              tx.type === 'DEPOSIT' ? 'bg-green-100 text-green-800' :
+                              tx.type === 'WITHDRAWAL' ? 'bg-red-100 text-red-800' :
+                              tx.type === 'PROFIT' ? 'bg-blue-100 text-blue-800' :
+                              tx.type === 'BONUS' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {tx.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold">${tx.amount.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                              tx.status === 'COMPLETED' || tx.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                              tx.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {tx.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
+                            {tx.remarks || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">No recent transactions</p>
+              )}
             </div>
           </>
         )}
@@ -699,6 +808,27 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Admin Actions */}
+            <div className="flex gap-3 mb-6">
+              <button
+                onClick={() => setShowBalanceAdjustModal(true)}
+                className="btn btn-primary flex-1"
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Adjust Balance
+              </button>
+              <button
+                onClick={() => {
+                  setShowNetworkTreeModal(true);
+                  fetchNetworkTree(selectedMember.id);
+                }}
+                className="btn btn-secondary flex-1"
+              >
+                <Network className="h-4 w-4 mr-2" />
+                View Network Tree
+              </button>
+            </div>
+
             {/* Tabs for History */}
             <div className="space-y-6">
               {/* Deposits */}
@@ -807,6 +937,153 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Balance Adjustment Modal */}
+      {showBalanceAdjustModal && selectedMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4">Adjust Balance - {selectedMember.username}</h3>
+            <form onSubmit={handleAdjustBalance} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Type
+                </label>
+                <select
+                  className="input"
+                  value={balanceAdjustForm.type}
+                  onChange={(e) => setBalanceAdjustForm({ ...balanceAdjustForm, type: e.target.value })}
+                >
+                  <option value="ADD">Add to Balance</option>
+                  <option value="DEDUCT">Deduct from Balance</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount (USDT)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0.01"
+                  step="0.01"
+                  className="input"
+                  placeholder="Enter amount"
+                  value={balanceAdjustForm.amount}
+                  onChange={(e) => setBalanceAdjustForm({ ...balanceAdjustForm, amount: e.target.value })}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Current balance: ${memberDetails?.user?.balance?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  className="input"
+                  placeholder="Enter reason for adjustment"
+                  value={balanceAdjustForm.reason}
+                  onChange={(e) => setBalanceAdjustForm({ ...balanceAdjustForm, reason: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBalanceAdjustModal(false);
+                    setBalanceAdjustForm({ amount: '', type: 'ADD', reason: '' });
+                  }}
+                  className="btn btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary flex-1">
+                  Confirm Adjustment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Network Tree Modal */}
+      {showNetworkTreeModal && selectedMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-6xl w-full p-6 my-8">
+            <div className="flex justify-between items-start mb-6">
+              <h3 className="text-2xl font-bold">Network Tree - {selectedMember.username}</h3>
+              <button
+                onClick={() => {
+                  setShowNetworkTreeModal(false);
+                  setNetworkTree(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {networkTree ? (
+              <div className="overflow-auto max-h-[70vh]">
+                <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Root User</p>
+                      <p className="font-bold text-lg">{networkTree.user.username}</p>
+                      <p className="text-xs text-gray-500">ID: {networkTree.user.id}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600">Balance</p>
+                      <p className="font-bold text-lg text-green-600">${networkTree.user.balance?.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">Level: {networkTree.user.level}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border-l-2 border-gray-300 ml-4 pl-4">
+                  {renderNetworkTree(networkTree.networkTree, 1)}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                <p className="mt-3 text-gray-600">Loading network tree...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
+  
+  function renderNetworkTree(tree: any, level: number): React.ReactNode {
+    if (!tree || !Array.isArray(tree) || tree.length === 0 || level > 10) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-2">
+        {tree.map((node: any, index: number) => (
+          <div key={node.id || index} className="border-l-2 border-gray-200 pl-4 py-2">
+            <div className="bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-sm">{node.username}</p>
+                  <p className="text-xs text-gray-500">ID: {node.id.substring(0, 8)}...</p>
+                  <p className="text-xs text-gray-500">Level {level} • {node.level}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-green-600">${node.balance?.toFixed(2)}</p>
+                  <p className="text-xs text-gray-500">{node.email}</p>
+                </div>
+              </div>
+            </div>
+            {node.children && renderNetworkTree(node.children, level + 1)}
+          </div>
+        ))}
+      </div>
+    );
+  }
 }
