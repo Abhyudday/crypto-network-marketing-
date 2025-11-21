@@ -30,8 +30,8 @@ export const RANK_CONFIGS: RankConfig[] = [
     minBalance: 500,
     maxBalance: 999,
     bonusLevels: 3,
-    profitShareUser: 60,
-    profitShareCompany: 40,
+    profitShareUser: 55,
+    profitShareCompany: 45,
     levelName: 'Beginner',
   },
   {
@@ -39,8 +39,8 @@ export const RANK_CONFIGS: RankConfig[] = [
     minBalance: 1000,
     maxBalance: 4999,
     bonusLevels: 7,
-    profitShareUser: 70,
-    profitShareCompany: 30,
+    profitShareUser: 60,
+    profitShareCompany: 40,
     levelName: 'Investor',
   },
   {
