@@ -334,9 +334,14 @@ export const inputTradingResult = async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Parse trading date in GMT+7 timezone
+    // Convert the input date string to GMT+7 midnight
+    const inputDate = new Date(tradingDate);
+    inputDate.setHours(0, 0, 0, 0);
+    
     // Check if result already exists for this date
     const existingResult = await prisma.tradingResult.findUnique({
-      where: { tradingDate: new Date(tradingDate) },
+      where: { tradingDate: inputDate },
     });
 
     if (existingResult) {
@@ -345,11 +350,11 @@ export const inputTradingResult = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Create trading result
+    // Create trading result with normalized date
     const tradingResult = await prisma.tradingResult.create({
       data: {
         profitPercent: parseFloat(profitPercent),
-        tradingDate: new Date(tradingDate),
+        tradingDate: inputDate,
         description,
         createdBy: adminId,
       },

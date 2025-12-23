@@ -256,19 +256,31 @@ export const getDailyBonusBreakdown = async (req: AuthRequest, res: Response) =>
     const userId = req.userId!;
     const { date } = req.query;
 
-    // Get today's date if not provided
-    const targetDate = date ? new Date(date as string) : new Date();
+    // Convert to GMT+7 timezone for proper date boundary
+    const now = new Date();
+    const gmt7Offset = 7 * 60;
+    const localOffset = now.getTimezoneOffset();
+    const totalOffset = gmt7Offset + localOffset;
+    const gmt7Now = new Date(now.getTime() + totalOffset * 60 * 1000);
+
+    // Get target date in GMT+7
+    let targetDate: Date;
+    if (date) {
+      targetDate = new Date(date as string);
+    } else {
+      targetDate = new Date(gmt7Now);
+    }
     targetDate.setHours(0, 0, 0, 0);
 
     const nextDay = new Date(targetDate);
     nextDay.setDate(nextDay.getDate() + 1);
 
-    // Get bonuses for the specific date using createdAt
-    // Note: tradingDate column may not exist in older database schemas
+    // Get bonuses for the specific date using tradingDate
+    // Filter by tradingDate to match when profit was distributed
     const bonuses = await prisma.bonusHistory.findMany({
       where: {
         userId,
-        createdAt: {
+        tradingDate: {
           gte: targetDate,
           lt: nextDay,
         },
