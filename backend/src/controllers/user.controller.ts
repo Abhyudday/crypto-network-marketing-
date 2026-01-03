@@ -270,23 +270,36 @@ export const getDailyBonusBreakdown = async (req: AuthRequest, res: Response) =>
     const userId = req.userId!;
     const { date } = req.query;
 
-    // Get target date with "before 2 AM = previous day" logic
     let targetDate: Date;
+    
     if (date) {
       // If date is explicitly provided, use it as-is
       targetDate = new Date(date as string);
+      targetDate.setHours(0, 0, 0, 0);
     } else {
-      // No date provided - use current date with 2 AM rule
-      const now = new Date();
-      const currentHour = now.getHours();
-      
-      targetDate = new Date();
-      // If before 2 AM, use yesterday's date for trading date
-      if (currentHour < 2) {
-        targetDate.setDate(targetDate.getDate() - 1);
+      // No date provided - get the MOST RECENT processed trading result
+      // This ensures bonus remains visible until new profit is posted
+      const latestTradingResult = await prisma.tradingResult.findFirst({
+        where: {
+          processedAt: { not: null },
+        },
+        orderBy: { tradingDate: 'desc' },
+        select: { tradingDate: true },
+      });
+
+      if (!latestTradingResult) {
+        // No trading results yet
+        return res.json({
+          date: null,
+          bonuses: [],
+          totalDailyBonus: 0,
+          count: 0,
+        });
       }
+
+      targetDate = new Date(latestTradingResult.tradingDate);
+      targetDate.setHours(0, 0, 0, 0);
     }
-    targetDate.setHours(0, 0, 0, 0);
 
     const nextDay = new Date(targetDate);
     nextDay.setDate(nextDay.getDate() + 1);
