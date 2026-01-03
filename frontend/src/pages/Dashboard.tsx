@@ -165,7 +165,7 @@ export default function Dashboard() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <img 
-                src="/assets/orbitx-logo.svg" 
+                src="/src/assets/orbitx-logo.svg" 
                 alt="OrbitX Logo" 
                 className="h-12"
               />
