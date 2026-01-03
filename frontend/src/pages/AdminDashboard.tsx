@@ -196,7 +196,7 @@ export default function AdminDashboard() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <img 
-                src="/assets/orbitx-logo.svg" 
+                src="/logo.png" 
                 alt="OrbitX Logo" 
                 className="h-12"
               />

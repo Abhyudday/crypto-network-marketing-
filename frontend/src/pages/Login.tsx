@@ -36,7 +36,7 @@ export default function Login() {
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <img 
-            src="/assets/orbitx-logo.svg" 
+            src="/logo.png" 
             alt="OrbitX Logo" 
             className="h-32 mx-auto mb-4"
           />
