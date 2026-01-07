@@ -13,9 +13,19 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path} - ${req.ip} - ${new Date().toISOString()}`);
+  console.log('📋 Headers:', req.headers.origin);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log('📝 Body:', { ...req.body, password: req.body.password ? '[HIDDEN]' : undefined });
+  }
+  next();
+});
+
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL?.split(',') || ['http://localhost:5173', 'http://localhost:5001'],
+  origin: process.env.FRONTEND_URL?.split(',') || ['http://localhost:5173', 'http://localhost:5001', 'https://orbitx.group', 'https://www.orbitx.group'],
   credentials: true
 }));
 app.use(express.json());
