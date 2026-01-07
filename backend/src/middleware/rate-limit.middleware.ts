@@ -1,4 +1,5 @@
 import rateLimit from 'express-rate-limit';
+import { Request } from 'express';
 
 // General API rate limiter
 export const apiLimiter = rateLimit({
@@ -9,7 +10,7 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => {
+  skip: (req: Request) => {
     // Skip rate limiting for health checks
     return req.path === '/health';
   },
